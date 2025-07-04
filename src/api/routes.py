@@ -20,8 +20,10 @@ def create_token():
     user = User.query.filter_by(email=email, password=password).first()
     if not user:
         return jsonify({"msg": "Bad email or password"}), 401
+    if not user.check_password(password):
+        return jsonify({"msg": "Bad email or password"}), 401
 
-    access_token = create_access_token(identity=email)
+    access_token = create_access_token(identity=user.id)
     return jsonify(access_token=access_token)
 
 
@@ -37,7 +39,8 @@ def create_user():
     if user:
         return jsonify({"msg": "Email already registered"}), 409 # Conflict
 
-    new_user = User(email=email, password=password)
+    new_user = User(email=email)
+    new_user.set_password(password)
 
     try:
         db.session.add(new_user)
@@ -51,8 +54,13 @@ def create_user():
 @api.route("/protected", methods=["GET"])
 @jwt_required()
 def protected():
-    current_user_identity = get_jwt_identity()
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+
+    if not user:
+        return jsonify({"msg": "User not found"}), 404
+
     return jsonify(
-        logged_in_as=current_user_identity,
+        logged_in_as=user.email,
         message="You have access to this protected data!"
     ), 200
